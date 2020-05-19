@@ -1,0 +1,752 @@
+---
+title: "DATA 622 - HW1"
+author: "Michael Y."
+date: "3/18/2020"
+output:
+  pdf_document:
+    md_extensions: +grid_tables
+    toc: yes
+    toc_depth: 3
+    keep_md: yes
+    keep_tex: yes
+  html_document:
+    highlight: pygments
+    theme: cerulean
+    code_folding: show
+    toc: yes
+    toc_float: yes
+    toc_depth: 3
+    keep_md: yes
+    md_extensions: +grid_tables
+classoption: portrait
+urlcolor: blue
+linkcolor: blue
+editor_options:
+  chunk_output_type: inline
+header-includes: 
+- \usepackage{graphicx}
+- \usepackage{float}
+---
+
+<style>
+  .main-container {
+    max-width: 1200px !important;
+  }
+</style>
+---
+
+# DATA 622 - HW1
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(kableExtra)
+```
+
+## Q1: Naive Bayes
+
+```{r HW1-Q1-readdata}
+df1 <- read.csv('HW1-Q1-40.csv', skip = 1, header = T, 
+                nrows = 14, stringsAsFactors  = T) %>% 
+  rename(agegroup = 'age.group', 
+         credit = 'credit_rating', 
+         prospect = "class.prospect")
+
+df1 %>% 
+  kable(caption = "Prospect Data") %>%
+  kable_styling(c("bordered","striped"),full_width = F)
+
+summary(df1)
+```
+
+#### You have been hired by a local electronics retailer and the above dataset has been given to you.
+
+#### Manager Bayes Jr. 9th wants to create a spreadsheet to predict if a customer is a likely prospect. 
+
+#### To that end,
+
+### 1) Compute prior probabilities for the Prospect Yes/No
+```{r HW1Q1-priors}
+#### Number of observations
+N <- length(df1$prospect)
+N
+
+#### Tally of Prospect=[yes|no]
+Prospect.Prior.Tally <- table(df1$prospect)
+Prospect.Prior.Tally
+
+#### Probability of Prospect=[yes|no]
+Prospect.Prior.Prob <- prop.table(table(df1$prospect))
+Prospect.Prior.Prob
+
+```
+
+$P(prospect=no) = `r Prospect.Prior.Prob["no"]`$    
+$P(prospect=yes) = `r Prospect.Prior.Prob["yes"]`$    
+
+
+### 2) Compute the conditional probabilities
+
+* $P(agegroup=youth|prospect=yes)$ and
+* $P(agegroup=youth|prospect=no)$
+
+#### where age-group is a predictor variable.
+
+```{r HW1Q1-condprob}
+library(janitor)
+
+#### Conditional Probabilities for agegroup
+condprob.agegroup  <- df1 %>% 
+  tabyl(prospect,agegroup) %>% 
+  adorn_percentages("row") 
+rownames(condprob.agegroup) <- t(condprob.agegroup["prospect"])
+condprob.agegroup
+
+#### Conditional Probabilities for networth
+condprob.networth  <- df1 %>% 
+  tabyl(prospect,networth) %>% 
+  adorn_percentages("row") 
+rownames(condprob.networth) <- t(condprob.networth["prospect"])
+condprob.networth
+
+#### Conditional Probabilities for status
+condprob.status  <- df1 %>% 
+  tabyl(prospect,status) %>% 
+  adorn_percentages("row") 
+rownames(condprob.status) <- t(condprob.status["prospect"])
+condprob.status
+
+#### Conditional Probabilities for credit
+condprob.credit  <- df1 %>% 
+  tabyl(prospect,credit) %>% 
+  adorn_percentages("row") 
+rownames(condprob.credit) <- t(condprob.credit["prospect"])
+condprob.credit
+
+```
+#### Compute the conditional probabilities for each predictor variable, namely,
+
+(age_group,networth,status,credit_rating)
+
+
+
+#### Conditional Probabilities:   
+$$\begin{aligned}
+P(agegroup=youth    |prospect=yes) &= `r condprob.agegroup["yes","youth"]`   \\
+P(agegroup=middle   |prospect=yes) &= `r condprob.agegroup["yes","middle"]`  \\  
+P(agegroup=senior   |prospect=yes) &= `r condprob.agegroup["yes","senior"]`  \\  
+P(agegroup=youth    |prospect=no)  &= `r condprob.agegroup["no","youth"]`    \\  
+P(agegroup=middle   |prospect=no)  &= `r condprob.agegroup["no","middle"]`   \\  
+P(agegroup=senior   |prospect=no)  &= `r condprob.agegroup["no","senior"]`   \\  
+P(networth=high     |prospect=yes) &= `r condprob.networth["yes","high"]`    \\   
+P(networth=low      |prospect=yes) &= `r condprob.networth["yes","low"]`     \\
+P(networth=medium   |prospect=yes) &= `r condprob.networth["yes","medium"]`  \\      
+P(networth=high     |prospect=no)  &= `r condprob.networth["no","high"]`     \\   
+P(networth=low      |prospect=no)  &= `r condprob.networth["no","low"]`      \\
+P(networth=medium   |prospect=no)  &= `r condprob.networth["no","medium"]`   \\      
+P(status=employed   |prospect=yes) &= `r condprob.status["yes","employed"]`  \\   
+P(status=unemployed |prospect=yes) &= `r condprob.status["yes","unemployed"]`\\     
+P(status=employed   |prospect=no)  &= `r condprob.status["no","employed"]`   \\   
+P(status=unemployed |prospect=no)  &= `r condprob.status["no","unemployed"]` \\   
+P(credit=fair       |prospect=yes) &= `r condprob.credit["yes","fair"]`      \\   
+P(credit=excellent  |prospect=yes) &= `r condprob.credit["yes","excellent"]` \\   
+P(credit=fair       |prospect=no)  &= `r condprob.credit["no","fair"]`       \\   
+P(credit=excellent  |prospect=no)  &= `r condprob.credit["no","excellent"]`  \\   
+\end{aligned}$$
+
+
+### 3) Posterior Probabilities
+
+#### Assuming the assumptions of Naive Bayes are met, 
+#### compute the posterior probability $P(prospect|X)$ 
+#### where X is one of the predictor variable.
+
+
+By Bayes rule, the **posterior** probability is defined as 
+
+$P(c|x) = \frac{P(x|c)\cdot P(c)}{P(x)}$
+
+where 
+
+* $P(x|c)$ is the **likelihood**
+* $P(c)$ is the **class prior** probability
+* $P(x)$ is the **predictor prior** probability.
+
+Here, $P(prospect|x) = \frac{P(x|prospect)\cdot P(prospect)}{P(x)}$  .   
+
+Under the Naive Bayes assumption that multiple features $X = (x_1, x_2, x_3, x_4)$ are conditionally independent, given the class, we have 
+$$P(x_1, x_2, x_3, x_4 | \text{prospect}) = 
+P(x_1 | \text{prospect}) \cdot 
+P(x_2 | \text{prospect}) \cdot 
+P(x_3 | \text{prospect}) \cdot 
+P(x_4 | \text{prospect})$$
+
+
+
+Here, 
+$$\begin{aligned}
+P(\text{prospect}|x_1, x_2, x_3, x_4) 
+&= \frac{P(x_1, x_2, x_3, x_4|\text{prospect})\cdot 
+         P(\text{prospect})}
+         {P(x_1, x_2, x_3, x_4)} \\
+&= \frac{P(x_1 | \text{prospect}) \cdot 
+P(x_2 | \text{prospect}) \cdot 
+P(x_3 | \text{prospect}) \cdot 
+P(x_4 | \text{prospect}))\cdot 
+         P(\text{prospect})}
+         {P(x_1, x_2, x_3, x_4)}
+\end{aligned}$$
+
+where the denominator is  
+
+$$\begin{aligned}
+P(x_1, x_2, x_3, x_4) &= 
+P(x_1 | \text{prospect=yes}) \cdot 
+P(x_2 | \text{prospect=yes}) \cdot 
+P(x_3 | \text{prospect=yes}) \cdot 
+P(x_4 | \text{prospect=yes}))\cdot 
+P(\text{prospect=yes}) \\
+&+ P(x_1 | \text{prospect=no}) \cdot 
+P(x_2 | \text{prospect=no}) \cdot 
+P(x_3 | \text{prospect=no}) \cdot 
+P(x_4 | \text{prospect=no}))\cdot 
+P(\text{prospect=no})
+\end{aligned}$$ 
+
+
+#### Example 1: a poor, unemployed youth with fair credit
+
+Consider the following values for the predictor variables:
+
+* agegroup = youth
+* networth = low
+* status = unemployed
+* credit = fair
+
+Then the numererator is
+
+$$P(agegroup = youth | \text{prospect}) \cdot 
+P(networth = low | \text{prospect}) \cdot 
+P(status = unemployed | \text{prospect}) \cdot 
+P(credit = fair | \text{prospect}))\cdot 
+         P(\text{prospect})$$
+         
+where prospect can be either yes or no.
+
+The denominator is the sum of the two cases.
+
+For **prospect = yes** we have  $P(prospect=yes) = `r Prospect.Prior.Prob["yes"]`$   
+and 
+$$\begin{aligned}
+P(agegroup=youth    |prospect=yes) &= `r condprob.agegroup["yes","youth"]`   \\
+P(networth=low      |prospect=yes) &= `r condprob.networth["yes","low"]`     \\
+P(status=unemployed |prospect=yes) &= `r condprob.status["yes","unemployed"]`\\     
+P(credit=fair       |prospect=yes) &= `r condprob.credit["yes","fair"]`      \\   
+\end{aligned}$$
+
+which computes as 
+```{r posterior-yes-numerator}
+posteriorYesNumerator <- Prospect.Prior.Prob["yes"] * 
+  condprob.agegroup["yes","youth"] * 
+  condprob.networth["yes","low"] *
+  condprob.status["yes","unemployed"] *
+  condprob.credit["yes","fair"]
+posteriorYesNumerator
+```
+
+For **prospect = no** we have $P(prospect=no) = `r Prospect.Prior.Prob["no"]`$   
+and 
+$$\begin{aligned}
+P(agegroup=youth    |prospect=no) &= `r condprob.agegroup["no","youth"]`   \\
+P(networth=low      |prospect=no) &= `r condprob.networth["no","low"]`     \\
+P(status=unemployed |prospect=no) &= `r condprob.status["no","unemployed"]`\\     
+P(credit=fair       |prospect=no) &= `r condprob.credit["no","fair"]`      \\   
+\end{aligned}$$
+
+which computes as 
+```{r posterior-no-numerator}
+posteriorNoNumerator <- Prospect.Prior.Prob["no"] * 
+  condprob.agegroup["no","youth"] * 
+  condprob.networth["no","low"] *
+  condprob.status["no","unemployed"] *
+  condprob.credit["no","fair"]
+posteriorNoNumerator
+``` 
+
+Therefore, the denominator is
+
+```{r evidence}
+evidence = as.numeric(posteriorYesNumerator + posteriorNoNumerator)
+evidence
+```
+
+so the posterior for **prospect = yes** given the above features is
+
+```{r posterior-yes}
+posteriorYes = posteriorYesNumerator / evidence
+posteriorYes
+```
+
+and the posterior for **prospect = no** is
+
+```{r posterior-no}
+posteriorNo = posteriorNoNumerator / evidence
+posteriorNo
+```
+
+
+##### This does seem rather counterintutive -- that an unemployed youth, with low net worth, and credit which is only "fair", should be such a strong "prospect", i.e., 86% yes vs. 14% no.    
+
+##### (Purely by coincidence, this exact case does happen to be in the input dataset -- though I did not select it on that basis, and only realized that after performing the above calculations.)
+
+#### Example 2: a wealthy, employed senior with excellent credit
+
+On the other hand, let's consider the following values for the predictor variables:
+
+* agegroup = senior
+* networth = high
+* status = employed
+* credit = excellent
+
+Then the numererator is
+
+$$P(agegroup = senior | \text{prospect}) \cdot 
+P(networth = high | \text{prospect}) \cdot 
+P(status = employed | \text{prospect}) \cdot 
+P(credit = excellent | \text{prospect}))\cdot 
+         P(\text{prospect})$$
+         
+where prospect can be either yes or no.
+
+The denominator is the sum of the two cases.
+
+For **prospect = yes** we have $P(prospect=yes) = `r Prospect.Prior.Prob["yes"]`$   
+and 
+$$\begin{aligned}
+P(agegroup=senior |prospect=yes) &= `r condprob.agegroup["yes","senior"]`   \\
+P(networth=high   |prospect=yes) &= `r condprob.networth["yes","high"]`     \\
+P(status=employed |prospect=yes) &= `r condprob.status["yes","employed"]`  \\     
+P(credit=excellent|prospect=yes) &= `r condprob.credit["yes","excellent"]`      \\   
+\end{aligned}$$
+
+which computes as 
+```{r posterior-yes-numerator2}
+posteriorYesNumerator2 <- Prospect.Prior.Prob["yes"] * 
+  condprob.agegroup["yes","senior"] * 
+  condprob.networth["yes","high"] *
+  condprob.status["yes","employed"] *
+  condprob.credit["yes","excellent"]
+posteriorYesNumerator2
+```
+
+For **prospect = no** we have $P(prospect=no) = `r Prospect.Prior.Prob["no"]`$   
+and 
+$$\begin{aligned}
+P(agegroup=senior |prospect=no) &= `r condprob.agegroup["no","senior"]`   \\
+P(networth=high   |prospect=no) &= `r condprob.networth["no","high"]`     \\
+P(status=employed |prospect=no) &= `r condprob.status["no","employed"]`  \\     
+P(credit=excellent|prospect=no) &= `r condprob.credit["no","excellent"]`      \\  
+\end{aligned}$$
+
+which computes as 
+```{r posterior-no-numerator2}
+posteriorNoNumerator2 <- Prospect.Prior.Prob["no"] * 
+  condprob.agegroup["no","senior"] * 
+  condprob.networth["no","high"] *
+  condprob.status["no","employed"] *
+  condprob.credit["no","excellent"]
+posteriorNoNumerator2
+``` 
+
+Therefore, the denominator is
+
+```{r evidence2}
+evidence2 = as.numeric(posteriorYesNumerator2 + posteriorNoNumerator2)
+evidence2
+```
+
+so the posterior for **prospect = yes** given the above features is
+
+```{r posterior-yes2}
+posteriorYes2 = posteriorYesNumerator2 / evidence2
+posteriorYes2
+```
+
+and the posterior for **prospect = no** is
+
+```{r posterior-no2}
+posteriorNo2 = posteriorNoNumerator2 / evidence2
+posteriorNo2
+```
+
+
+##### This does seem rather counterintutive -- that an employed senior, with high net worth, and excellent credit, should be such a weak "prospect", i.e., 84% no vs. 16% yes.    
+
+##### I'm unsure what sort of electronics they are selling, but their model does seem quite naive.
+
+***
+\newpage
+
+## Q2: Exploratory Data Analysis
+
+You just recently joined a datascience team.    
+
+There are two datasets `junk1.txt` and `junk2.csv`    
+
+They have two options:    
+
+1. They can go back to the client and ask for more data to remedy problems with the data.    
+2. They can accept the data and undertake a major analytics exercise.    
+
+The team is relying on your data science skills to determine how they should proceed.    
+
+Can you explore the data and recommend actions for each file, enumerating the reasons?   
+
+
+```{r HW1-Q2-libraries}
+library(ggplot2)
+library(GGally)
+```
+
+
+### First dataset ("junk1")
+
+```{r HW1-Q2-readdata1}
+junk1 <- read.csv('junk1.txt', header = TRUE, sep = " ", dec = ".")
+# Correlation matrix (class is numeric 1|2 )
+cor(junk1)
+# Standard Deviation of entire dataset
+sapply(X = junk1, FUN = sd)
+# Standard Deviation of class=1
+sapply(X=junk1[junk1$class==1,], FUN=sd)
+# Standard Deviation of class=2
+sapply(X=junk1[junk1$class==2,], FUN=sd)
+# Make class into a factor
+junk1$class <- as.factor(junk1$class)
+# summary of junk1
+summary(junk1)
+# table of junk1 class
+table(junk1$class)
+# plot the data with classes colored green and blue
+plot(b~a,data=junk1,col=as.numeric(class)+2,main="Scatterplot of junk1")
+ggpairs(junk1, aes(col = class, alpha = 0.25), 
+        title = "ggPairs plot of dataset junk1",
+        lower=list(combo=wrap("facethist",  binwidth=0.5)))
+
+```
+
+This is a small dataset, with only 100 observations.   
+
+The dataset is balanced -- there are 50 observations in each of the two classes.   
+
+Each class appears to be normally distributed, with mean/median close to zero and similar standard deviations.
+
+As we don't know what is the purpose of the data, the mission is unclear.
+
+If the purpose is classification, this would be difficult because the data is overlapping across the space -- it doesn't appear that there is sufficient differentiation to enable classification.
+
+Because the dataset is so small, it may be necessary to ask whether additional data may be available.  
+
+
+### Second dataset ("junk2")
+
+```{r HW1-Q2-readdata2}
+junk2 <- read.csv('junk2.csv', header = TRUE, sep = ",", dec = ".")
+
+# Correlation matrix (class is numeric 0|1 )
+cor(junk2)
+
+# Standard Deviation of entire dataset
+sapply(X = junk2, FUN = sd)
+# Standard Deviation of class=0
+sapply(X=junk2[junk2$class==0,], FUN=sd)
+# Standard Deviation of class=1
+sapply(X=junk2[junk2$class==1,], FUN=sd)
+
+# Make class into a factor
+junk2$class <- as.factor(junk2$class)
+
+# table of junk2 class
+table(junk2$class)
+
+# summary of junk2
+summary(junk2)
+# summary of junk2, larger class only
+summary(junk2[junk2$class==0,])
+# summary of junk2, smaller class only
+summary(junk2[junk2$class==1,])
+
+# plot the data with classes colored green and blue
+plot(b~a,data=junk2,col=as.numeric(class)+2, main="Scatterplot of junk2")
+ggpairs(junk2, aes(col = class, alpha = 0.25), 
+        title = "ggPairs plot of dataset junk2",
+        lower=list(combo=wrap("facethist",binwidth=0.25)))
+```
+
+
+This is a much larger dataset, with 4000 observations.  
+
+However, the two classes are imbalanced, as there are 3750 observations in one class and 250 observations in the other, which is a ratio of 15:1.
+
+The larger class is centered close to  (0,0) with a standard deviation of 1.3 in each direction.   
+
+The smaller class is centered around (a=1,b=-1) with a much smaller standard deviation (0.5)   
+
+As such, if classification is the goal, this may be possible because the values in the smaller class are clustered in a narrow range.  
+
+A radial basis function may catch most of the items in the smaller class, however it would likely misclassify those elements from the larger class which happen to fall within the area dominated by the smaller class.     
+
+The issue of class imbalance may lead to overfitting, but this could be addressed by undersampling the larger dataset.    
+
+It is important to gain more information about the goal because it is unclear, for example, whether the two datasets (junk1 and junk2) are supposed to be somehow related to each other, or whether each represents unrelated data.   
+
+
+***
+\newpage
+## Q3: K-nearest neighbors
+
+
+
+   
+
+
+
+
+
+
+
+
+
+
+
+### Load the ICU data
+
+```{r load-icu-data}
+# Please find icu.csv
+# Read the icu.csv
+icu_raw <- read.csv("icu.csv")
+dim(icu_raw)
+summary(icu_raw)
+
+
+# The formula to fit is "STA ~ TYP + COMA + AGE + INF"
+# subset it with these 5 features in the formula, and STA is the labelcol.   
+
+# The dataset MUST Be numeric, except the labelcol    
+# The labelcol must be the last column in the data.frame   
+# All the other columns must be before the labelcol
+
+icu_raw %>% 
+  mutate(COMA = ifelse(LOC == 2, 1, 0)) %>%
+  select(TYP, COMA, AGE, INF, STA) -> icu
+
+
+summary(icu)
+# TYP
+table(icu$TYP)
+# COMA
+table(icu$COMA)
+# AGE
+table(icu$AGE)
+hist(icu$AGE,breaks = 16,col="lightgreen")
+# INF
+table(icu$INF)
+# STA
+table(icu$INF)
+# Correlation
+cor(icu)
+cormat <- as.matrix(cor(icu))
+library(corrplot)
+
+corrplot(corr = cormat, type = "full", outline = T,  
+         method = "color", sig.level = 0.05, insig = "blank", 
+         addCoef.col = "black",number.cex = 1.1, 
+         number.font = 1, number.digits = 2 )
+
+# summary stats
+icu %>% 
+  mutate(TYP = factor(TYP), COMA = factor(COMA), INF = factor(INF), 
+         STA = factor(STA)) %>% 
+  summary()
+```
+
+### Split the icu 70/30 train/test
+```{r Q3_ttsplit}
+# create training/test partitions
+
+## Trying to find a seed which will reduce or eliminate class imbalance 
+## between the testing and training split.  After trial and error, 
+## this seed worked exactly to form an 80/20 split on the class variable.
+set.seed(3)
+
+
+N <- nrow(icu)   # N = 200
+train_index <- sample(N, size = 0.7 * N)    # 140 random indices
+train_icu <- icu[train_index, ]               # 140 cases
+test_icu  <- icu[-train_index, ]              # 60 cases
+save_test_icu <- test_icu
+
+# check for class imbalance
+STA_column <- which(colnames(icu)=="STA")       # column containing class labels 
+# Proportion of STA in Training set
+table(STA_train = train_icu[,STA_column])/length(train_icu$STA)
+# Proportion of STA in Testing set
+table(STA_test = test_icu[,STA_column])/length(test_icu$STA)
+
+```
+
+Each of the training and testing sets contains the same proportion of each item in the STA class.  
+This was found by trial-and-error adjustment of the initial seed.
+
+#### KNN.R code
+
+#### Euclidean Distance
+```{r euclidean-dist}
+
+euclideanDist <- function(a, b){
+  d = 0
+  mincols = min(length(a),length(b)) # I had to change this in order to avoid 
+  for(i in c(1:mincols))             # subscript out-of-bounds errors
+  {                                  # as extra columns are appended to the test set
+    d = d + (a[[i]]-b[[i]])^2        # but those columns are not to be calculated
+  }
+  d = sqrt(d)
+  return(d)
+}
+```
+
+
+#### KNN-Predict2 function
+```{r knn_predict2}
+
+knn_predict2 <- function(test_data, train_data, k_value, labelcol){
+  pred <- c()  #empty pred vector 
+  #LOOP-1
+  for(i in c(1:nrow(test_data))){   #looping over each record of test data
+    eu_dist =c()          #eu_dist & eu_char empty  vector
+    eu_char = c()
+    good = 0              #good & bad variable initialization with 0 value
+    bad = 0
+    
+    #LOOP-2-looping over train data 
+    for(j in c(1:nrow(train_data))){
+ 
+      #adding euclidean distance b/w test data point and train data to eu_dist vector
+      eu_dist <- c(eu_dist, euclideanDist(test_data[i,-c(labelcol)], train_data[j,-c(labelcol)]))
+ 
+      #adding class variable of training data in eu_char
+      eu_char <- c(eu_char, as.character(train_data[j,][[labelcol]]))
+    }
+    
+    eu <- data.frame(eu_char, eu_dist) #eu dataframe created with eu_char & eu_dist columns
+ 
+    eu <- eu[order(eu$eu_dist),]       #sorting eu dataframe to gettop K neighbors
+    eu <- eu[1:k_value,]               #eu dataframe with top K neighbors
+ 
+    tbl.sm.df<-table(eu$eu_char)
+    cl_label<-  names(tbl.sm.df)[[as.integer(which.max(tbl.sm.df))]]
+    
+    pred <- c(pred, cl_label)
+    }
+    return(pred) #return pred vector
+}
+
+```
+
+
+#### Accuracy Metric
+```{r accuracy}
+accuracy <- function(test_data,labelcol,predcol){
+  correct = 0
+  for(i in c(1:nrow(test_data))){
+    if(test_data[i,labelcol] == test_data[i,predcol]){ 
+      correct = correct+1
+    }
+  }
+  accu = (correct/nrow(test_data)) * 100  
+  return(accu)
+}
+
+```
+
+### run the kNN.R for K=(3,5,7,15,25,50)
+
+```{r run-KNN}
+# set of k values
+kvalues <- c(3, 5, 7, 15, 25, 50)
+numk <- length(kvalues)
+
+# accuracy metric & contingency table
+accuracy_results <- c()
+confusion_matrix <- list()
+
+
+### Reset test_icu, if re-running, to drop any extraneous columns on the right
+test_icu <- test_icu[,1:5]
+
+labelcol <- STA_column   ### column containing "STA" colname
+
+# loop over the values for K
+for (i in 1:numk) {
+  #print(i)
+    kval <- kvalues[i]
+  #print(kval)
+    whichk <- paste0("k=", kval)
+  print(paste(i,whichk))  
+    # calc kNN predictions & add to test df
+  #print("call knn_predict2")
+    predictions <- knn_predict2(test_icu, train_icu, kval, labelcol) 
+  #print("return from knn_predict2")
+    test_icu[whichk] <- predictions # append a column to test_icu    
+    
+    # compute accuracy and contingency table
+  #print("call accuracy")
+    accuracy_results[whichk] <- accuracy(test_icu, labelcol, labelcol + i)
+  print(paste("Accuracy[",whichk,"]",accuracy_results[whichk]))
+  print(paste("confusion",whichk))
+    confusion_matrix[[whichk]] <- 
+      addmargins(table(Pred = factor(test_icu[[labelcol + i]],
+                                     levels = c("0", "1")), 
+                       Obs = test_icu[[labelcol]]))
+  print(confusion_matrix[[whichk]])
+  print("________________________________________")
+}
+```
+
+### submit the result confusionMatrix, Accuracy for each K
+
+### Accuracy results
+```{r accuracy_results}
+accuracy_results %>% 
+  kable(caption = "kNN Accuracy for various K") %>%   
+  kable_styling(c("bordered","striped"),full_width = F)
+```
+
+### Accuracy plot
+
+#### Plot Accuracy vs K.
+```{r accuracy-plot}
+plot(accuracy_results ~ kvalues,typ="b", col="blue",main = "accuracy vs. K-value for KNN")
+```
+
+### List of Confusion matrices, for each k
+```{r confusion_matrix}
+confusion_matrix
+```
+
+### Commentary
+
+#### write a short summary of your findings.
+
+While the accuracy increases as k is increased, the problem is that this model will ultimately classify every observation into the larger class, achieving 100 percent accuracy on those cases but achieving 0% accuracy on the items in the smaller class, all of which become misclassified into the larger class.    
+
+This is a problem which arises with imbalanced classes.   It could be addressed, for example, by undersampling the large class, or oversampling (e.g., via repetition) the smaller class.
+
+
+#### Grade
+
+* Grade-->40
+* Changing the code 10
+* Running for different values of K 10
+* Plot Accuracy 10
+* Summary 10
